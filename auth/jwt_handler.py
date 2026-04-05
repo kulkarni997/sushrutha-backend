@@ -16,11 +16,12 @@ EXPIRY_DAYS = 7
 
 security = HTTPBearer()
 
-def create_token(user_id: str, role: str, name: str) -> str:
+def create_token(user_id: str, role: str, name: str, plan: str = 'free') -> str:
     payload = {
         "sub": user_id,
         "role": role,
         "name": name,
+        "plan": plan,
         "exp": datetime.utcnow() + timedelta(days=EXPIRY_DAYS)
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=ALGORITHM)

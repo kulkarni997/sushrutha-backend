@@ -1,8 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from passlib.context import CryptContext
 from db.supabase_client import supabase
-from auth.jwt_handler import create_token
+from auth.jwt_handler import create_token, get_current_user
 import uuid
 
 router = APIRouter()
@@ -54,7 +54,8 @@ async def register(body: RegisterRequest):
             "subscription_active": False,
         }).execute()
 
-    token = create_token(user_id, body.role, body.full_name)
+    plan = 'free'
+    token = create_token(user_id, role, full_name, plan)
     return {"token": token, "role": body.role, "user_id": user_id, "full_name": body.full_name}
 
 
@@ -70,10 +71,39 @@ async def login(body: LoginRequest):
     if not pwd_context.verify(body.password, user["hashed_password"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    if user["role"] == "doctor":
-        doctor = supabase.table("doctors").select("verified").eq("id", user["id"]).execute()
-        if not doctor.data or not doctor.data[0]["verified"]:
-            raise HTTPException(status_code=403, detail="Account pending verification. Contact admin.")
+    if user["role"] == "patient":
+        plan = user.get("patient_plan", "free")
+    else:
+        doctor_full = supabase.table("doctors").select("subscription_tier").eq("id", user["id"]).single().execute()
+        plan = doctor_full.data.get("subscription_tier", "free") if doctor_full.data else "free"
 
-    token = create_token(user["id"], user["role"], user["full_name"])
-    return {"token": token, "role": user["role"], "user_id": user["id"], "full_name": user["full_name"]}
+    token = create_token(user["id"], user["role"], user["full_name"], plan)
+    return {"token": token, "role": user["role"], "user_id": user["id"], "full_name": user["full_name"], "plan": plan}
+
+
+class SubscribeRequest(BaseModel):
+    plan: str
+
+
+@router.post("/subscribe")
+async def subscribe(body: SubscribeRequest,
+                    user: dict = Depends(get_current_user)):
+
+    valid_plans = ['free', 'basic', 'pro', 'pro_family']
+    if body.plan not in valid_plans:
+        raise HTTPException(status_code=400,
+                            detail="Invalid plan selected")
+
+    if user['role'] == 'patient':
+        supabase.table('users')\
+            .update({'patient_plan': body.plan})\
+            .eq('id', user['sub'])\
+            .execute()
+    else:
+        raise HTTPException(status_code=400,
+                            detail="Use doctor upgrade endpoint")
+
+    return {
+        "message": f"Plan upgraded to {body.plan} successfully",
+        "plan": body.plan
+    }
