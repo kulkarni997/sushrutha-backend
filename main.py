@@ -24,6 +24,32 @@ app.add_middleware(
 
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 
+from routes.messages import router as messages_router
+from routes.notifications import router as notifications_router
+from routes.doctor import router as doctor_router
+from routes.guest import router as guest_router
+from routes.clinics import router as clinics_router
+from routes.history import router as history_router
+from routes.diagnose import router as diagnose_router
+from routes.vision import router as vision_router
+from routes.voice import router as voice_router
+from routes.pulse import router as pulse_router
+from routes.recipe import router as recipe_router
+from routes.forecast import router as forecast_router
+
+app.include_router(messages_router, tags=["messages"])
+app.include_router(notifications_router, tags=["notifications"])
+app.include_router(doctor_router, prefix="/doctor", tags=["doctor"])
+app.include_router(guest_router, prefix="/guest", tags=["guest"])
+app.include_router(clinics_router, tags=["clinics"])
+app.include_router(history_router, tags=["history"])
+app.include_router(diagnose_router, tags=["diagnose"])
+app.include_router(vision_router, tags=["vision"])
+app.include_router(voice_router, tags=["voice"])
+app.include_router(pulse_router, tags=["pulse"])
+app.include_router(recipe_router, tags=["recipe"])
+app.include_router(forecast_router, tags=["forecast"])
+
 
 @app.get("/")
 async def root():
