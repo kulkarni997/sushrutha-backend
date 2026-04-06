@@ -1,15 +1,13 @@
-import uuid
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from passlib.context import CryptContext
 from db.supabase_client import supabase
-from auth.jwt_handler import create_token
+from auth.jwt_handler import create_token, get_current_user
+import uuid
 
 router = APIRouter()
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-VALID_ROLES = {"patient", "doctor"}
 
 
 class RegisterRequest(BaseModel):
@@ -26,73 +24,94 @@ class LoginRequest(BaseModel):
 
 
 @router.post("/register")
-def register(req: RegisterRequest):
-    if req.role not in VALID_ROLES:
-        raise HTTPException(status_code=400, detail="Role must be 'patient' or 'doctor'.")
+async def register(body: RegisterRequest):
+    if body.role not in ("patient", "doctor"):
+        raise HTTPException(status_code=400, detail="Role must be 'patient' or 'doctor'")
 
-    if req.role == "doctor" and not req.bams_number:
-        raise HTTPException(status_code=400, detail="BAMS number required for doctors.")
+    if body.role == "doctor" and not body.bams_number:
+        raise HTTPException(status_code=400, detail="BAMS number required for doctors")
 
-    existing = (
-        supabase.table("users").select("id").eq("email", req.email).execute()
-    )
+    existing = supabase.table("users").select("id").eq("email", body.email).execute()
     if existing.data:
-        raise HTTPException(status_code=400, detail="Email already registered.")
+        raise HTTPException(status_code=400, detail="Email already registered")
 
-    hashed_password = pwd_context.hash(req.password)
+    hashed_password = pwd_context.hash(body.password)
     user_id = str(uuid.uuid4())
 
     supabase.table("users").insert({
         "id": user_id,
-        "email": req.email,
+        "email": body.email,
         "hashed_password": hashed_password,
-        "role": req.role,
-        "full_name": req.full_name,
+        "role": body.role,
+        "full_name": body.full_name,
     }).execute()
 
-    if req.role == "doctor":
+    if body.role == "doctor":
         supabase.table("doctors").insert({
             "id": user_id,
-            "bams_number": req.bams_number,
+            "bams_number": body.bams_number,
             "verified": False,
             "subscription_active": False,
         }).execute()
 
-    token = create_token(user_id, req.role, req.full_name)
-    return {"token": token, "role": req.role, "user_id": user_id, "full_name": req.full_name}
+    plan = 'free'
+    token = create_token(user_id, role, full_name, plan)
+    # return {"token": token, "role": body.role, "user_id": user_id, "full_name": body.full_name}
+    token = create_token(user_id, body.role, body.full_name, plan)
+    return {
+        "token": token, 
+        "role": body.role, 
+        "user_id": user_id, 
+        "full_name": body.full_name,
+        "plan": plan
+    }
 
 
 @router.post("/login")
-def login(req: LoginRequest):
-    result = (
-        supabase.table("users")
-        .select("id, email, hashed_password, role, full_name")
-        .eq("email", req.email)
-        .execute()
-    )
+async def login(body: LoginRequest):
+    result = supabase.table("users").select("*").eq("email", body.email).execute()
 
     if not result.data:
-        raise HTTPException(status_code=401, detail="Invalid credentials.")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
 
     user = result.data[0]
 
-    if not pwd_context.verify(req.password, user["hashed_password"]):
-        raise HTTPException(status_code=401, detail="Invalid credentials.")
+    if not pwd_context.verify(body.password, user["hashed_password"]):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    if user["role"] == "doctor":
-        doctor = (
-            supabase.table("doctors").select("verified").eq("id", user["id"]).execute()
-        )
-        if not doctor.data or not doctor.data[0]["verified"]:
-            raise HTTPException(
-                status_code=403,
-                detail="Account pending verification. Contact admin.",
-            )
+    if user["role"] == "patient":
+        plan = user.get("patient_plan", "free")
+    else:
+        doctor_full = supabase.table("doctors").select("subscription_tier").eq("id", user["id"]).single().execute()
+        plan = doctor_full.data.get("subscription_tier", "free") if doctor_full.data else "free"
 
-    token = create_token(user["id"], user["role"], user["full_name"])
+    token = create_token(user["id"], user["role"], user["full_name"], plan)
+    return {"token": token, "role": user["role"], "user_id": user["id"], "full_name": user["full_name"], "plan": plan}
+
+
+class SubscribeRequest(BaseModel):
+    plan: str
+
+
+@router.post("/subscribe")
+async def subscribe(body: SubscribeRequest,
+                    user: dict = Depends(get_current_user)):
+
+    valid_plans = ['free', 'basic', 'pro', 'pro_family']
+    if body.plan not in valid_plans:
+        raise HTTPException(status_code=400,
+                            detail="Invalid plan selected")
+
+    if user['role'] == 'patient':
+        supabase.table('users')\
+            .update({'patient_plan': body.plan})\
+            .eq('id', user['sub'])\
+            .execute()
+    else:
+        raise HTTPException(status_code=400,
+                            detail="Use doctor upgrade endpoint")
+
     return {
-        "token": token,
-        "role": user["role"],
-        "user_id": user["id"],
-        "full_name": user["full_name"],
+        "message": f"Plan upgraded to {body.plan} successfully",
+        "plan": body.plan
     }
