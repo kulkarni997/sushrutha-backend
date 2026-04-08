@@ -1,11 +1,15 @@
-from rag.retriever import retrieve_context
 import os
+
+try:
+    from rag.retriever import retrieve_context
+except Exception:
+    def retrieve_context(dosha, symptoms=""):
+        return ""
 
 def generate_recipe(dosha: str, symptoms: str = "", vata: int = 0, pitta: int = 0, kapha: int = 0) -> str:
     context = retrieve_context(dosha, symptoms)
     
     if not context:
-        # Fallback if no FAISS index yet
         return get_fallback_recipe(dosha)
     
     try:
@@ -16,7 +20,6 @@ def generate_recipe(dosha: str, symptoms: str = "", vata: int = 0, pitta: int = 
             max_new_tokens=300,
             temperature=0.7
         )
-        
         prompt = f"""You are an Ayurvedic doctor. Based on the following classical texts:
 
 {context}
@@ -30,7 +33,6 @@ Provide a personalized herbal recipe with:
 3. Diet recommendation
 
 Answer:"""
-        
         result = generator(prompt)[0]["generated_text"]
         answer = result.split("Answer:")[-1].strip()
         return answer
@@ -46,3 +48,4 @@ def get_fallback_recipe(dosha: str) -> str:
         "kapha": "Trikatu 500mg before meals.\nGuggulu 500mg twice daily.\nYoga: Surya Namaskar, Bhastrika.\nDiet: Light, dry, warm foods."
     }
     return recipes.get(dosha.lower(), recipes["vata"])
+
