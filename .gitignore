@@ -10,3 +10,4 @@ faiss_index/
 *.log
 .DS_Store"rag/pdfs/" 
 "rag/faiss_index/" 
+"rag/pdfs/" 
