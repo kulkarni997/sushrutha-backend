@@ -6,9 +6,21 @@ router = APIRouter()
 
 @router.get("/history/{user_id}")
 async def get_history(user_id: str, user: dict = Depends(require_patient)):
-    scans = supabase.table("scans")\
-        .select("*, results(*)")\
+    # Get scans
+    scans_res = supabase.table("scans")\
+        .select("*")\
         .eq("user_id", user["sub"])\
         .order("created_at", desc=True)\
         .execute()
-    return scans.data
+    
+    scans = scans_res.data or []
+    
+    # For each scan, get its result
+    for scan in scans:
+        result = supabase.table("results")\
+            .select("*")\
+            .eq("scan_id", scan["id"])\
+            .execute()
+        scan["results"] = result.data[0] if result.data else None
+    
+    return scans
