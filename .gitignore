@@ -6,8 +6,10 @@ __pycache__/
 *.pt
 *.pth
 *.pkl
+rag/pdfs/
+rag/faiss_index/
 faiss_index/
 *.log
-.DS_Store"rag/pdfs/" 
-"rag/faiss_index/" 
-"rag/pdfs/" 
+.DS_Store
+mock_esp32.py
+old_requirements_backup.txt
