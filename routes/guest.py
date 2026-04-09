@@ -18,23 +18,23 @@ async def claim_scan(payload: ClaimPayload):
     session = supabase.table("guest_scans")\
         .select("*")\
         .eq("claim_token", payload.token)\
-        .single()\
         .execute()
     
     if not session.data:
         raise HTTPException(404, "Invalid claim token")
     
+    session_data = session.data[0]
+    
     # Check expiry
-    expires = session.data["token_expires_at"]
+    expires = session_data["token_expires_at"]
     if expires and datetime.utcnow().isoformat() > expires:
         raise HTTPException(400, "Claim token has expired")
     
     # Check already claimed
-    if session.data["claimed_by"]:
+    if session_data["claimed_by"]:
         raise HTTPException(400, "This scan has already been claimed")
     
     # Create user account
-    import hashlib
     from passlib.context import CryptContext
     pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
     hashed = pwd_context.hash(payload.password)
@@ -51,7 +51,7 @@ async def claim_scan(payload: ClaimPayload):
     # Link scan to new user
     supabase.table("guest_scans")\
         .update({"claimed_by": new_user_id})\
-        .eq("id", session.data["id"])\
+        .eq("id", session_data["id"])\
         .execute()
     
     return {"message": "Scan claimed successfully", "user_id": new_user_id}

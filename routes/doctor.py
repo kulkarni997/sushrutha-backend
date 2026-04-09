@@ -18,47 +18,67 @@ class ResultsOverride(BaseModel):
 @router.get("/patients")
 async def get_patients(user: dict = Depends(require_doctor)):
     scans = supabase.table("scans")\
-        .select("*, results(*), users(full_name)")\
+        .select("*")\
         .eq("shared_with", user["sub"])\
         .eq("shared", True)\
         .order("created_at", desc=True)\
         .execute()
-    return scans.data
+    
+    scans_data = scans.data or []
+    
+    for scan in scans_data:
+        # Get result
+        result = supabase.table("results").select("*").eq("scan_id", scan["id"]).execute()
+        scan["results"] = result.data[0] if result.data else None
+        # Get user name
+        user_data = supabase.table("users").select("full_name").eq("id", scan["user_id"]).execute()
+        scan["full_name"] = user_data.data[0]["full_name"] if user_data.data else None
+    
+    return scans_data
 
 @router.get("/patient/{scan_id}")
 async def get_patient(scan_id: str, user: dict = Depends(require_doctor)):
     scan = supabase.table("scans")\
-        .select("*, results(*)")\
+        .select("*")\
         .eq("id", scan_id)\
         .eq("shared_with", user["sub"])\
-        .single()\
         .execute()
+    
     if not scan.data:
-        raise HTTPException(404, "Scan not found")
-    return scan.data
-
-@router.post("/walkin")
-async def create_walkin(payload: WalkinCreate, user: dict = Depends(require_doctor)):
-    claim_token = str(uuid.uuid4())
-    expires = datetime.utcnow() + timedelta(hours=48)
-    result = supabase.table("guest_scans").insert({
-        "doctor_id": user["sub"],
-        "patient_name": payload.patient_name,
-        "claim_token": claim_token,
-        "token_expires_at": expires.isoformat()
-    }).execute()
-    return result.data[0]
+        raise HTTPException(404, "Scan not found or not shared with you")
+    
+    result = supabase.table("results").select("*").eq("scan_id", scan_id).execute()
+    scan.data[0]["results"] = result.data[0] if result.data else None
+    return scan.data[0]
 
 @router.get("/walkin/{session_id}")
 async def get_walkin(session_id: str, user: dict = Depends(require_doctor)):
     session = supabase.table("guest_scans")\
-        .select("*, results(*)")\
+        .select("*")\
+        .eq("id", session_id)\
+        .eq("doctor_id", user["sub"])\
+        .execute()
+    
+    if not session.data:
+        raise HTTPException(404, "Session not found")
+    
+    result = supabase.table("results").select("*").eq("scan_id", session_id).execute()
+    session.data[0]["results"] = result.data[0] if result.data else None
+    return session.data[0]
+
+@router.get("/walkin/{session_id}")
+async def get_walkin(session_id: str, user: dict = Depends(require_doctor)):
+    session = supabase.table("guest_scans")\
+        .select("*")\
         .eq("id", session_id)\
         .eq("doctor_id", user["sub"])\
         .single()\
         .execute()
     if not session.data:
         raise HTTPException(404, "Session not found")
+    
+    result = supabase.table("results").select("*").eq("scan_id", session_id).execute()
+    session.data["results"] = result.data[0] if result.data else None
     return session.data
 
 @router.patch("/results/{result_id}")
