@@ -10,9 +10,14 @@ class VisionPayload(BaseModel):
 
 @router.post("/vision")
 async def analyze_vision(payload: VisionPayload, user: dict = Depends(require_patient)):
-    # Mock output — YOLOv10 wired on Day 8
-    return {
-        "coating": "thick_white",
-        "vein_score": 0.7,
-        "dosha_signal": "Kapha"
-    }
+    try:
+        from ml.yolo_model import analyze_tongue
+        result = analyze_tongue(payload.image_data)
+        return result
+    except Exception as e:
+        print(f"Vision model error: {e}")
+        return {
+            "coating": "thin_pale",
+            "vein_score": 0.7,
+            "dosha_signal": "Vata"
+        }

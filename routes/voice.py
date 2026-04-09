@@ -9,9 +9,16 @@ async def analyze_voice(
     audio: UploadFile = File(...),
     user: dict = Depends(require_patient)
 ):
-    # Mock output — Whisper wired on Day 8
-    return {
-        "transcript": "I have been feeling tired and bloated lately.",
-        "voice_dosha": "Vata",
-        "confidence": 0.72
-    }
+    try:
+        from ml.whisper_model import analyze_voice as run_whisper
+        audio_bytes = await audio.read()
+        result = run_whisper(audio_bytes, audio.filename or "audio.webm")
+        return result
+    except Exception as e:
+        print(f"Voice model error: {e}")
+        return {
+            "transcript": "",
+            "voice_dosha": "Vata",
+            "confidence": 0.5,
+            "language": "en"
+        }

@@ -55,7 +55,7 @@ async def register(body: RegisterRequest):
         }).execute()
 
     plan = 'free'
-    token = create_token(user_id, role, full_name, plan)
+    token = create_token(user_id, body.role, body.full_name, plan)
     # return {"token": token, "role": body.role, "user_id": user_id, "full_name": body.full_name}
     token = create_token(user_id, body.role, body.full_name, plan)
     return {

@@ -8,7 +8,20 @@ load_dotenv(override=True)
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+
 from routes.auth import router as auth_router
+from routes.messages import router as messages_router
+from routes.notifications import router as notifications_router
+from routes.doctor import router as doctor_router
+from routes.guest import router as guest_router
+from routes.clinics import router as clinics_router
+from routes.history import router as history_router
+from routes.diagnose import router as diagnose_router
+from routes.vision import router as vision_router
+from routes.voice import router as voice_router
+from routes.pulse import router as pulse_router
+from routes.recipe import router as recipe_router
+from routes.forecast import router as forecast_router
 
 logger = logging.getLogger(__name__)
 
@@ -23,20 +36,6 @@ app.add_middleware(
 )
 
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
-
-from routes.messages import router as messages_router
-from routes.notifications import router as notifications_router
-from routes.doctor import router as doctor_router
-from routes.guest import router as guest_router
-from routes.clinics import router as clinics_router
-from routes.history import router as history_router
-from routes.diagnose import router as diagnose_router
-from routes.vision import router as vision_router
-from routes.voice import router as voice_router
-from routes.pulse import router as pulse_router
-from routes.recipe import router as recipe_router
-from routes.forecast import router as forecast_router
-
 app.include_router(messages_router, tags=["messages"])
 app.include_router(notifications_router, tags=["notifications"])
 app.include_router(doctor_router, prefix="/doctor", tags=["doctor"])
@@ -50,11 +49,9 @@ app.include_router(pulse_router, tags=["pulse"])
 app.include_router(recipe_router, tags=["recipe"])
 app.include_router(forecast_router, tags=["forecast"])
 
-
 @app.get("/")
 async def root():
     return {"message": "Sushrutha AI API", "status": "running", "version": "1.0.0"}
-
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
@@ -62,7 +59,6 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         status_code=exc.status_code,
         content={"detail": exc.detail, "status_code": exc.status_code},
     )
-
 
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):
