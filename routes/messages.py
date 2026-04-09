@@ -49,7 +49,7 @@ async def get_messages(thread_id: str, user: dict = Depends(require_patient)):
         raise HTTPException(403, "Access denied")
     return msgs.data
 
-@router.post("/messages/doctor")
+@router.post("/doctor/messages")
 async def send_message_doctor(payload: MessageCreate, user: dict = Depends(require_doctor)):
     thread_id = get_thread_id(user["sub"], payload.receiver_id, payload.scan_id)
     msg = supabase.table("messages").insert({
