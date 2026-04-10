@@ -4,8 +4,8 @@ from auth.jwt_handler import require_patient
 
 router = APIRouter()
 
-@router.get("/history/{user_id}")
-async def get_history(user_id: str, user: dict = Depends(require_patient)):
+@router.get("/history")
+async def get_history(user: dict = Depends(require_patient)):
     scans = supabase.table("scans")\
         .select("*, results(*)")\
         .eq("user_id", user["sub"])\
