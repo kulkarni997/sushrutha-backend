@@ -22,3 +22,11 @@ async def mark_seen(notif_id: str, user: dict = Depends(require_patient)):
         .eq("user_id", user["sub"])\
         .execute()
     return {"ok": True}
+
+@router.patch("/notifications/seen")
+async def mark_seen(user: dict = Depends(require_patient)):
+    supabase.table("notifications")\
+        .update({"seen": True})\
+        .eq("user_id", user["sub"])\
+        .execute()
+    return {"ok": True}

@@ -22,6 +22,8 @@ from routes.voice import router as voice_router
 from routes.pulse import router as pulse_router
 from routes.recipe import router as recipe_router
 from routes.forecast import router as forecast_router
+from routes.scans import router as scans_router
+
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +50,7 @@ app.include_router(voice_router, tags=["voice"])
 app.include_router(pulse_router, tags=["pulse"])
 app.include_router(recipe_router, tags=["recipe"])
 app.include_router(forecast_router, tags=["forecast"])
+app.include_router(scans_router)
 
 @app.get("/")
 async def root():
