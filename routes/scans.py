@@ -21,7 +21,19 @@ async def share_scan(scan_id: str, payload: SharePayload, user: dict = Depends(r
         .eq("id", scan_id)\
         .eq("user_id", user["sub"])\
         .execute()
-    return result.data[0]
+    
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Scan not found or not yours")
+    
+    # Also create notification for doctor
+    supabase.table("notifications").insert({
+        "user_id": payload.doctor_id,
+        "type": "report_shared",
+        "reference_id": scan_id,
+        "seen": False
+    }).execute()
+    
+    return {"message": "Scan shared successfully", "scan_id": scan_id}
 
 @router.post("/scans")
 async def create_scan(payload: ScanCreate, user: dict = Depends(require_patient)):

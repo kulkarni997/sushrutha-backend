@@ -82,12 +82,19 @@ async def login(body: LoginRequest):
     if user["role"] == "patient":
         plan = user.get("patient_plan", "free")
     else:
-        doctor_full = supabase.table("doctors").select("subscription_tier").eq("id", user["id"]).single().execute()
+        doctor_full = supabase.table("doctors").select("subscription_tier, verified").eq("id", user["id"]).single().execute()
         plan = doctor_full.data.get("subscription_tier", "free") if doctor_full.data else "free"
+        if not doctor_full.data.get("verified", False):
+            raise HTTPException(status_code=403, detail="Your account is pending verification. Please contact admin.")
 
     token = create_token(user["id"], user["role"], user["full_name"], plan)
-    return {"token": token, "role": user["role"], "user_id": user["id"], "full_name": user["full_name"], "plan": plan}
-
+    return {
+        "token": token,
+        "role": user["role"],
+        "user_id": user["id"],
+        "full_name": user["full_name"],
+        "plan": plan
+    }
 
 class SubscribeRequest(BaseModel):
     plan: str
