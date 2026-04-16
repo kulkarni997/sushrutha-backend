@@ -94,18 +94,58 @@ async def diagnose(
 ):
     scan_id = payload.scan_id
 
-    # Run vision + voice in parallel
+    # DEMO MODE — skip all ML, return realistic hardcoded response instantly
+    if DEMO_MODE:
+        # Pick demo response based on symptoms keyword
+        symptoms_lower = payload.symptoms_text.lower()
+        if any(w in symptoms_lower for w in ["acidity", "anger", "heat", "rash", "headache"]):
+            demo = DEMO_RESPONSES["Pitta"]
+        elif any(w in symptoms_lower for w in ["weight", "congestion", "heavy", "slow", "mucus"]):
+            demo = DEMO_RESPONSES["Kapha"]
+        else:
+            demo = DEMO_RESPONSES["Vata"]
+
+        try:
+            result = supabase.table("results").insert({
+                "scan_id":    scan_id,
+                "vata_pct":   demo["vata"],
+                "pitta_pct":  demo["pitta"],
+                "kapha_pct":  demo["kapha"],
+                "severity":   demo["severity"],
+                "pulse_used": payload.pulse_used,
+                "recipe_text": demo["recipe"],
+                "finalised":  False
+            }).execute()
+            result_id = result.data[0]["id"] if result.data else None
+        except Exception as e:
+            print(f"Demo results insert error: {e}")
+            result_id = None
+
+        return {
+            "vata":           demo["vata"],
+            "pitta":          demo["pitta"],
+            "kapha":          demo["kapha"],
+            "severity":       demo["severity"],
+            "dominant_dosha": demo["dominant_dosha"],
+            "pulse_used":     payload.pulse_used,
+            "avg_bpm":        demo["avg_bpm"] if payload.pulse_used else None,
+            "avg_spo2":       demo["avg_spo2"] if payload.pulse_used else None,
+            "recipe":         demo["recipe"],
+            "vision":         demo["vision"],
+            "voice":          demo["voice"],
+            "result_id":      result_id
+        }
+
+    # REAL MODE — full ML pipeline
     vision_result, voice_result = await asyncio.gather(
         run_vision(payload.image_data),
         run_voice(payload.audio_data)
     )
 
-    # Get pulse averages from DB if pulse_used
     avg_bpm, avg_spo2 = None, None
     if payload.pulse_used:
         avg_bpm, avg_spo2 = get_pulse_averages(scan_id)
 
-    # SVM ensemble
     from ml.svm_ensemble import run_svm_ensemble
     scores = run_svm_ensemble(
         vision_result=vision_result,
@@ -122,10 +162,8 @@ async def diagnose(
     severity       = assess_severity(vata, pitta, kapha)
     dominant_dosha = get_dominant_dosha(vata, pitta, kapha)
 
-    # RAG recipe (runs after SVM, not in parallel — needs dosha output)
     recipe_text = await run_recipe(dominant_dosha, payload.symptoms_text, severity)
 
-    # Save to Supabase results table
     try:
         result = supabase.table("results").insert({
             "scan_id":    scan_id,
@@ -137,7 +175,6 @@ async def diagnose(
             "recipe_text": recipe_text,
             "finalised":  False
         }).execute()
-
         result_id = result.data[0]["id"] if result.data else None
     except Exception as e:
         print(f"Results insert error: {e}")
