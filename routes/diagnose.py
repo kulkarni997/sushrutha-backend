@@ -5,6 +5,8 @@ from typing import Optional
 from db.supabase_client import supabase
 from auth.jwt_handler import require_patient
 
+DEMO_MODE = False
+
 router = APIRouter()
 
 class DiagnosePayload(BaseModel):
