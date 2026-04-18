@@ -5,7 +5,47 @@ from typing import Optional
 from db.supabase_client import supabase
 from auth.jwt_handler import require_patient
 
-DEMO_MODE = False
+import os
+DEMO_MODE = os.environ.get("DEMO_MODE", "false").lower() == "true"
+
+DEMO_RESPONSES = {
+    "Vata": {
+        "vata":           62,
+        "pitta":          24,
+        "kapha":          14,
+        "severity":       "moderate",
+        "dominant_dosha": "Vata",
+        "avg_bpm":        82,
+        "avg_spo2":       97,
+        "recipe":         "Ashwagandha 500mg twice daily with warm milk. Sesame oil self-massage (abhyanga) before bath. Favour warm, cooked, moist meals — khichdi, stewed vegetables, ghee. Avoid raw salads, cold drinks, and skipping meals. Sleep by 10pm.",
+        "vision":         {"coating": "thin_dry", "vein_score": 0.72, "dosha_signal": "Vata"},
+        "voice":          {"voice_dosha": "Vata", "confidence": 0.81, "transcript": "I have been feeling anxious and my sleep has been disturbed for the past two weeks", "language": "en"}
+    },
+    "Pitta": {
+        "vata":           18,
+        "pitta":          68,
+        "kapha":          14,
+        "severity":       "moderate",
+        "dominant_dosha": "Pitta",
+        "avg_bpm":        88,
+        "avg_spo2":       96,
+        "recipe":         "Shatavari 500mg after meals with rose water. Amla juice 20ml on empty stomach. Coconut water twice daily. Favour cooling foods — cucumber, mint, coriander, sweet fruits. Avoid chillies, fermented food, and eating late. Moonlight walks help.",
+        "vision":         {"coating": "yellow_red", "vein_score": 0.45, "dosha_signal": "Pitta"},
+        "voice":          {"voice_dosha": "Pitta", "confidence": 0.79, "transcript": "I have been having acidity and skin rashes and I get angry very easily these days", "language": "en"}
+    },
+    "Kapha": {
+        "vata":           16,
+        "pitta":          22,
+        "kapha":          62,
+        "severity":       "moderate",
+        "dominant_dosha": "Kapha",
+        "avg_bpm":        68,
+        "avg_spo2":       98,
+        "recipe":         "Trikatu 250mg before meals with warm water. Ginger-tulsi tea first thing in the morning. Favour light, warm, spiced foods — millets, lentils, steamed greens. Avoid dairy, fried food, and daytime sleep. 30 minutes of brisk walking daily is essential.",
+        "vision":         {"coating": "thick_white", "vein_score": 0.28, "dosha_signal": "Kapha"},
+        "voice":          {"voice_dosha": "Kapha", "confidence": 0.83, "transcript": "I feel heavy and congested and I have been gaining weight and feeling sleepy during the day", "language": "en"}
+    }
+}
 
 router = APIRouter()
 
