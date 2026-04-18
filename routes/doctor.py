@@ -113,20 +113,47 @@ async def finalise_report(result_id: str, user: dict = Depends(require_doctor)):
         .update({"finalised": True})\
         .eq("id", result_id)\
         .execute()
-    scan_id = result.data[0]["scan_id"]
-    scan = supabase.table("scans")\
-        .select("user_id")\
-        .eq("id", scan_id)\
-        .single()\
-        .execute()
-    if scan.data:
-        supabase.table("notifications").insert({
-            "user_id": scan.data["user_id"],
-            "type": "report_finalised",
-            "reference_id": scan_id,
-            "seen": False
-        }).execute()
-    return result.data[0]
+
+    if not result.data:
+        raise HTTPException(404, "Result not found")
+
+    row = result.data[0]
+    scan_id = row.get("scan_id")
+    guest_scan_id = row.get("guest_scan_id")
+
+    # Patient scan — notify the patient who owns the scan
+    if scan_id:
+        scan = supabase.table("scans")\
+            .select("user_id")\
+            .eq("id", scan_id)\
+            .single()\
+            .execute()
+        if scan.data:
+            supabase.table("notifications").insert({
+                "user_id": scan.data["user_id"],
+                "type": "report_finalised",
+                "reference_id": scan_id,
+                "seen": False
+            }).execute()
+
+    # Walk-in scan — notify the patient only if they've already claimed it
+    elif guest_scan_id:
+        gs = supabase.table("guest_scans")\
+            .select("claimed_by")\
+            .eq("id", guest_scan_id)\
+            .single()\
+            .execute()
+        claimed_by = gs.data.get("claimed_by") if gs.data else None
+        if claimed_by:
+            supabase.table("notifications").insert({
+                "user_id": claimed_by,
+                "type": "report_finalised",
+                "reference_id": guest_scan_id,
+                "seen": False
+            }).execute()
+        # If not claimed yet, no notification — patient doesn't have an account
+
+    return row
 
 @router.get("/analytics")
 async def get_analytics(user: dict = Depends(require_doctor)):
