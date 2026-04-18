@@ -86,7 +86,7 @@ async def get_walkin(session_id: str, user: dict = Depends(require_doctor)):
     
     result = supabase.table("results")\
         .select("*")\
-        .eq("scan_id", session_id)\
+        .eq("guest_scan_id", session_id)\
         .execute()
     session.data["results"] = result.data or []
     
