@@ -153,7 +153,7 @@ async def finalise_report(result_id: str, user: dict = Depends(require_doctor)):
             }).execute()
         # If not claimed yet, no notification — patient doesn't have an account
 
-    return row
+    return row  
 
 @router.get("/analytics")
 async def get_analytics(user: dict = Depends(require_doctor)):
