@@ -98,7 +98,8 @@ def generate_forecast(
     df_pitta = build_dosha_series(all_results, "pitta_pct")
     df_kapha = build_dosha_series(all_results, "kapha_pct")
 
-    use_prophet = all(len(df) >= 2 for df in [df_vata, df_pitta, df_kapha])
+    MIN_POINTS_FOR_PROPHET = 5
+    use_prophet = all(len(df) >= MIN_POINTS_FOR_PROPHET for df in [df_vata, df_pitta, df_kapha])
 
     if use_prophet:
         try:
