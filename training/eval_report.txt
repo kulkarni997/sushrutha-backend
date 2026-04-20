@@ -1,0 +1,42 @@
+======================================================================
+HEADLINE METRICS
+======================================================================
+Overall dominant-dosha consistency:  26/30  (86.7%)
+Percentage-sum sanity (should be 0): 0 failures
+Forecast monotonicity (healing up):  30/30  (100.0%)
+
+======================================================================
+PER-ARCHETYPE BREAKDOWN
+======================================================================
+  Vata    10/10  (100%)
+  Pitta   8/10  (80%)
+  Kapha   8/10  (80%)
+
+======================================================================
+CONFUSION MATRIX  (rows = archetype, cols = predicted)
+======================================================================
+            Vata   Pitta   Kapha
+  Vata        10       0       0
+  Pitta        1       8       1
+  Kapha        1       1       8
+
+======================================================================
+INFERENCE METHOD USAGE
+======================================================================
+  trained_svm           30/30
+
+======================================================================
+SAMPLE PROFILES (first 3)
+======================================================================
+  [1] archetype=Vata   predicted=Vata   ✓  scores=95/4/1  healing 10.5→49.0
+  [2] archetype=Vata   predicted=Vata   ✓  scores=64/34/2  healing 38.5→62.0
+  [3] archetype=Vata   predicted=Vata   ✓  scores=97/3/0  healing 10.5→48.0
+
+======================================================================
+NOTES FOR PITCH
+======================================================================
+- This is a PIPELINE CONSISTENCY test, not a clinical accuracy claim.
+- Synthetic profiles from the same distribution family as training,
+  generated with a different random seed (held out from training).
+- SVM + rule-based forecast tested end-to-end per profile.
+======================================================================
