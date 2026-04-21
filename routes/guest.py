@@ -167,7 +167,8 @@ async def guest_diagnose(
         voice_result=voice_result,
         pulse_used=payload.pulse_used and avg_bpm is not None,
         bpm=avg_bpm,
-        spo2=avg_spo2
+        spo2=avg_spo2,
+        symptoms_text=payload.symptoms_text,
     )
 
     vata  = scores["vata_pct"]

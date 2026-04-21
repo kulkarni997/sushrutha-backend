@@ -79,6 +79,52 @@ def normalize_spo2(spo2: float) -> float:
     return min(max((spo2 - 94) / 6.0, 0.0), 1.0)
 
 
+# Symptom keyword lexicon — standard Ayurvedic correspondences
+VATA_KEYWORDS = [
+    "anxiety", "worry", "insomnia", "restless", "dry skin", "constipation",
+    "gas", "bloating", "cold hand", "cold feet", "nervousness", "tremor",
+    "cracking joint", "irregular", "fear", "panic", "stiff", "weight loss",
+    "trouble sleeping", "racing thought"
+]
+
+PITTA_KEYWORDS = [
+    "acidity", "heartburn", "reflux", "rash", "inflammation", "anger",
+    "irritable", "frustration", "headache", "burning", "hot flush", "fever",
+    "skin redness", "ulcer", "sharp pain", "impatience", "sweating",
+    "loose stool", "diarrhea", "red eye"
+]
+
+KAPHA_KEYWORDS = [
+    "weight gain", "congestion", "mucus", "heavy", "lethargy", "sleepy",
+    "tired", "slow digestion", "water retention", "swelling", "cough",
+    "cold", "allergies", "attachment", "stubborn", "depressed", "sluggish",
+    "daytime sleepiness", "feeling heavy", "phlegm"
+]
+
+
+def extract_symptom_dosha_scores(symptoms_text: str) -> tuple:
+    """
+    Keyword-match the symptoms text to dosha-specific lexicons.
+    Returns (vata_score, pitta_score, kapha_score) normalized to [0, 1] each,
+    independently. Multiple doshas can be high simultaneously.
+    """
+    if not symptoms_text or not isinstance(symptoms_text, str):
+        return 0.0, 0.0, 0.0
+
+    text = symptoms_text.lower()
+    v_hits = sum(1 for kw in VATA_KEYWORDS  if kw in text)
+    p_hits = sum(1 for kw in PITTA_KEYWORDS if kw in text)
+    k_hits = sum(1 for kw in KAPHA_KEYWORDS if kw in text)
+
+    # Normalize by lexicon size, cap at 1.0 so a massive dump of Vata words
+    # doesn't blow past the bounds of the feature distribution
+    # Softer saturation: caps at 0.7 so symptoms can't dominate other signals
+    v = min(v_hits / 3.0, 0.7)
+    p = min(p_hits / 3.0, 0.7)
+    k = min(k_hits / 3.0, 0.7)
+    return float(v), float(p), float(k)
+
+
 def build_feature_vector(
     vision_dosha: str,
     vein_score: float,
@@ -86,19 +132,32 @@ def build_feature_vector(
     voice_confidence: float,
     bpm: Optional[float] = None,
     spo2: Optional[float] = None,
-    pulse_used: bool = False
+    pulse_used: bool = False,
+    symptoms_text: str = ""
 ) -> np.ndarray:
+    """
+    Feature vector (13 dims):
+    [vision_vata, vision_pitta, vision_kapha,   # 3  one-hot tongue
+     vein_score,                                 # 1  0-1 float
+     voice_vata, voice_pitta, voice_kapha,       # 3  one-hot voice
+     voice_confidence,                           # 1  0-1 float
+     bpm_norm, spo2_norm,                        # 2  0 if no pulse
+     sym_vata, sym_pitta, sym_kapha]             # 3  keyword-derived
+    """
     vision_enc = encode_dosha(vision_dosha)
     voice_enc = encode_dosha(voice_dosha)
 
     bpm_norm = normalize_bpm(bpm) if pulse_used and bpm else 0.0
     spo2_norm = normalize_spo2(spo2) if pulse_used and spo2 else 0.0
 
+    sym_v, sym_p, sym_k = extract_symptom_dosha_scores(symptoms_text)
+
     features = (
         vision_enc +
         [vein_score] +
         voice_enc +
-        [voice_confidence, bpm_norm, spo2_norm]
+        [voice_confidence, bpm_norm, spo2_norm,
+         sym_v, sym_p, sym_k]
     )
     return np.array(features, dtype=np.float32)
 
@@ -106,7 +165,8 @@ def build_feature_vector(
 def rule_based_scores(features: np.ndarray, pulse_used: bool) -> dict:
     """
     Weighted rule-based SVM substitute.
-    Weights: vision=0.45, voice=0.35, pulse=0.20 (0 if no pulse, redistributed)
+    Weights: vision=0.35, voice=0.25, pulse=0.15, symptoms=0.25
+    (redistributed when pulse absent)
     """
     vision_vata, vision_pitta, vision_kapha = features[0], features[1], features[2]
     vein_score = features[3]
@@ -114,11 +174,12 @@ def rule_based_scores(features: np.ndarray, pulse_used: bool) -> dict:
     voice_conf = features[7]
     bpm_norm = features[8]
     spo2_norm = features[9]
+    sym_vata, sym_pitta, sym_kapha = features[10], features[11], features[12]
 
     if pulse_used:
-        w_vision, w_voice, w_pulse = 0.45, 0.35, 0.20
+        w_vision, w_voice, w_pulse, w_symp = 0.35, 0.25, 0.15, 0.25
     else:
-        w_vision, w_voice, w_pulse = 0.55, 0.45, 0.0
+        w_vision, w_voice, w_pulse, w_symp = 0.40, 0.30, 0.0, 0.30
 
     vata_v = vision_vata * (1.0 + 0.2 * vein_score)
     pitta_v = vision_pitta * 1.0
@@ -135,9 +196,9 @@ def rule_based_scores(features: np.ndarray, pulse_used: bool) -> dict:
     else:
         vata_p = pitta_p = kapha_p = 0.0
 
-    raw_vata = w_vision * vata_v + w_voice * vata_vo + w_pulse * vata_p
-    raw_pitta = w_vision * pitta_v + w_voice * pitta_vo + w_pulse * pitta_p
-    raw_kapha = w_vision * kapha_v + w_voice * kapha_vo + w_pulse * kapha_p
+    raw_vata  = w_vision * vata_v  + w_voice * vata_vo  + w_pulse * vata_p  + w_symp * sym_vata
+    raw_pitta = w_vision * pitta_v + w_voice * pitta_vo + w_pulse * pitta_p + w_symp * sym_pitta
+    raw_kapha = w_vision * kapha_v + w_voice * kapha_vo + w_pulse * kapha_p + w_symp * sym_kapha
 
     total = raw_vata + raw_pitta + raw_kapha
     if total == 0:
@@ -159,7 +220,8 @@ def run_svm_ensemble(
     voice_result: dict,
     pulse_used: bool = False,
     bpm: Optional[float] = None,
-    spo2: Optional[float] = None
+    spo2: Optional[float] = None,
+    symptoms_text: str = ""
 ) -> dict:
     """
     Main entry point. Called from /diagnose route.
@@ -172,7 +234,8 @@ def run_svm_ensemble(
         voice_confidence=float(voice_result.get("confidence", 0.5)),
         bpm=bpm,
         spo2=spo2,
-        pulse_used=pulse_used
+        pulse_used=pulse_used,
+        symptoms_text=symptoms_text
     )
 
     try:

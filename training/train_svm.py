@@ -24,6 +24,31 @@ RNG = np.random.default_rng(42)
 # Each dosha archetype: plausible (dosha_label, vein_score range, confidence range,
 # pulse profile). Noise added so SVM learns a smooth boundary.
 
+VATA_SYMPTOM_POOL = [
+    "anxiety dry skin insomnia",
+    "constipation gas bloating",
+    "cold hands nervousness restless",
+    "trouble sleeping worry racing thoughts",
+    "irregular digestion dry skin panic",
+    "weight loss stiffness tremors",
+]
+PITTA_SYMPTOM_POOL = [
+    "acidity heartburn anger",
+    "skin rash inflammation irritable",
+    "burning sensation headache impatience",
+    "loose stool sweating hot flush",
+    "sharp pain red eyes frustration",
+    "ulcer reflux fever",
+]
+KAPHA_SYMPTOM_POOL = [
+    "weight gain congestion mucus",
+    "daytime sleepiness lethargy heavy",
+    "slow digestion tired swelling",
+    "cough cold allergies phlegm",
+    "feeling heavy sluggish depressed",
+    "water retention stubborn attachment",
+]
+
 def sample_vata():
     """Vata: thin/cracked tongue, high vein score, fast pulse, lower spo2 — with realistic confusion."""
     vision_dosha = RNG.choice(["Vata", "Pitta", "Kapha"], p=[0.55, 0.25, 0.20])
@@ -33,8 +58,14 @@ def sample_vata():
     bpm = float(np.clip(RNG.normal(90, 10), 55, 120))
     spo2 = float(np.clip(RNG.normal(95, 1.5), 90, 100))
     pulse_used = bool(RNG.random() > 0.3)
-    return vision_dosha, vein_score, voice_dosha, voice_conf, bpm, spo2, pulse_used
-
+    roll = RNG.random()
+    if roll < 0.30:
+        symptoms = ""
+    elif roll < 0.55:
+        symptoms = str(RNG.choice(PITTA_SYMPTOM_POOL + KAPHA_SYMPTOM_POOL))
+    else:
+        symptoms = str(RNG.choice(VATA_SYMPTOM_POOL))
+    return vision_dosha, vein_score, voice_dosha, voice_conf, bpm, spo2, pulse_used, symptoms
 
 def sample_pitta():
     """Pitta: red/yellow tongue, mid features — overlaps with both Vata and Kapha."""
@@ -45,7 +76,14 @@ def sample_pitta():
     bpm = float(np.clip(RNG.normal(78, 8), 55, 110))
     spo2 = float(np.clip(RNG.normal(96, 1.3), 90, 100))
     pulse_used = bool(RNG.random() > 0.3)
-    return vision_dosha, vein_score, voice_dosha, voice_conf, bpm, spo2, pulse_used
+    roll = RNG.random()
+    if roll < 0.30:
+        symptoms = ""
+    elif roll < 0.45:
+        symptoms = str(RNG.choice(VATA_SYMPTOM_POOL + KAPHA_SYMPTOM_POOL))
+    else:
+        symptoms = str(RNG.choice(PITTA_SYMPTOM_POOL))
+    return vision_dosha, vein_score, voice_dosha, voice_conf, bpm, spo2, pulse_used, symptoms
 
 
 def sample_kapha():
@@ -57,7 +95,14 @@ def sample_kapha():
     bpm = float(np.clip(RNG.normal(65, 8), 50, 95))
     spo2 = float(np.clip(RNG.normal(97, 1.2), 92, 100))
     pulse_used = bool(RNG.random() > 0.3)
-    return vision_dosha, vein_score, voice_dosha, voice_conf, bpm, spo2, pulse_used
+    roll = RNG.random()
+    if roll < 0.30:
+        symptoms = ""
+    elif roll < 0.45:
+        symptoms = str(RNG.choice(VATA_SYMPTOM_POOL + PITTA_SYMPTOM_POOL))
+    else:
+        symptoms = str(RNG.choice(KAPHA_SYMPTOM_POOL))
+    return vision_dosha, vein_score, voice_dosha, voice_conf, bpm, spo2, pulse_used, symptoms
 SAMPLERS = [sample_vata, sample_pitta, sample_kapha]
 LABELS = ["Vata", "Pitta", "Kapha"]
 N_PER_CLASS = 500
@@ -67,7 +112,7 @@ def generate_dataset():
     X, y = [], []
     for class_idx, sampler in enumerate(SAMPLERS):
         for _ in range(N_PER_CLASS):
-            vd, vs, vod, vc, bpm, spo2, pu = sampler()
+            vd, vs, vod, vc, bpm, spo2, pu, symp = sampler()
             feat = build_feature_vector(
                 vision_dosha=vd,
                 vein_score=vs,
@@ -76,6 +121,7 @@ def generate_dataset():
                 bpm=bpm,
                 spo2=spo2,
                 pulse_used=pu,
+                symptoms_text=symp,
             )
             X.append(feat)
             y.append(class_idx)

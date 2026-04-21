@@ -57,11 +57,17 @@ class DiagnosePayload(BaseModel):
     pulse_used: Optional[bool] = False
 
 def assess_severity(vata: int, pitta: int, kapha: int) -> str:
+    """
+    Severity rubric:
+      severe   - dominant >= 85% (near-monolithic imbalance, doctor-only)
+      moderate - dominant >= 60% OR (dominant >= 50 AND second >= 30)
+      mild     - otherwise
+    """
     dominant = max(vata, pitta, kapha)
     scores = sorted([vata, pitta, kapha], reverse=True)
-    if dominant >= 70:
+    if dominant >= 85:
         return "severe"
-    elif dominant >= 55 and scores[1] >= 30:
+    elif dominant >= 60 or (dominant >= 50 and scores[1] >= 30):
         return "moderate"
     else:
         return "mild"
@@ -194,7 +200,8 @@ async def diagnose(
         voice_result=voice_result,
         pulse_used=payload.pulse_used and avg_bpm is not None,
         bpm=avg_bpm,
-        spo2=avg_spo2
+        spo2=avg_spo2,
+        symptoms_text=payload.symptoms_text,
     )
 
     vata  = scores["vata_pct"]
