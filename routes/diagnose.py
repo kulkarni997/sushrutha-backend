@@ -99,25 +99,37 @@ def get_pulse_averages(scan_id: str) -> tuple:
 async def run_vision(image_data: Optional[str]) -> dict:
     fallback = {"coating": "thin_pale", "vein_score": 0.5, "dosha_signal": "Vata"}
     if not image_data:
+        print("[diagnose] run_vision: no image_data provided")
         return fallback
     try:
         from ml.yolo_model import analyze_tongue
-        return analyze_tongue(image_data)
+        print("[diagnose] run_vision: calling analyze_tongue")
+        result = analyze_tongue(image_data)
+        print(f"[diagnose] run_vision result: {result}")
+        return result
     except Exception as e:
-        print(f"Vision failed: {e}")
+        import traceback
+        print(f"[diagnose] run_vision FAILED: {e}")
+        traceback.print_exc()
         return fallback
 
 async def run_voice(audio_data: Optional[str]) -> dict:
     fallback = {"voice_dosha": "Vata", "confidence": 0.5, "transcript": "", "language": "en"}
     if not audio_data:
+        print("[diagnose] run_voice: no audio_data provided")
         return fallback
     try:
         import base64
         from ml.whisper_model import analyze_voice
+        print("[diagnose] run_voice: calling analyze_voice")
         audio_bytes = base64.b64decode(audio_data)
-        return analyze_voice(audio_bytes, "audio.webm")
+        result = analyze_voice(audio_bytes, "audio.webm")
+        print(f"[diagnose] run_voice result: {result}")
+        return result
     except Exception as e:
-        print(f"Voice failed: {e}")
+        import traceback
+        print(f"[diagnose] run_voice FAILED: {e}")
+        traceback.print_exc()
         return fallback
 
 async def run_recipe(dominant_dosha: str, symptoms_text: str, severity: str) -> str:
@@ -185,6 +197,12 @@ async def diagnose(
         }
 
     # REAL MODE — full ML pipeline
+    print(
+        f"[diagnose] real mode | "
+        f"image_data={'YES (' + str(len(payload.image_data)) + ' chars)' if payload.image_data else 'NO'} | "
+        f"audio_data={'YES (' + str(len(payload.audio_data)) + ' chars)' if payload.audio_data else 'NO'}",
+        flush=True,
+    )
     vision_result, voice_result = await asyncio.gather(
         run_vision(payload.image_data),
         run_voice(payload.audio_data)
@@ -203,6 +221,10 @@ async def diagnose(
         spo2=avg_spo2,
         symptoms_text=payload.symptoms_text,
     )
+
+    print(f"[diagnose] SVM scores: {scores}", flush=True)
+    print(f"[diagnose] vision_result: {vision_result}", flush=True)
+    print(f"[diagnose] voice_result: {voice_result}", flush=True)
 
     vata  = scores["vata_pct"]
     pitta = scores["pitta_pct"]

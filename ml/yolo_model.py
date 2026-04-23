@@ -57,7 +57,6 @@ def get_model():
 
 
 def _hsv_fallback(img):
-    """Legacy HSV rule-based analysis. Used when model unavailable or no detections."""
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     h, w = img.shape[:2]
     center = hsv[h//4:3*h//4, w//4:3*w//4]
@@ -67,13 +66,20 @@ def _hsv_fallback(img):
 
     avg_hue = float(np.mean(center[:, :, 0]))
     avg_sat = float(np.mean(center[:, :, 1]))
+    avg_val = float(np.mean(center[:, :, 2]))  # brightness
 
-    if avg_sat < 50:
-        coating, dosha_signal, vein_score = "thick_white", "Kapha", 0.3
-    elif avg_hue < 30 or avg_hue > 150:
-        coating, dosha_signal, vein_score = "yellow_orange", "Pitta", 0.6
+    # Pitta: warm hues (yellow/red), moderate-high saturation
+    if avg_sat > 60 and (avg_hue < 25 or avg_hue > 160):
+        coating, dosha_signal, vein_score = "yellow_orange", "Pitta", 0.55
+    # Kapha: high saturation, cool or neutral — OR very pale/white
+    elif avg_sat > 80 and 25 <= avg_hue <= 160:
+        coating, dosha_signal, vein_score = "thick_white", "Kapha", 0.35
+    # Vata: low saturation (pale, dry-looking), dim
+    elif avg_sat < 60 and avg_val < 160:
+        coating, dosha_signal, vein_score = "thin_pale", "Vata", 0.65
+    # Default — muted indoor shot, genuinely ambiguous → use neutral Vata
     else:
-        coating, dosha_signal, vein_score = "thin_pale", "Vata", 0.7
+        coating, dosha_signal, vein_score = "thin_pale", "Vata", 0.45
 
     return {
         "coating": coating,

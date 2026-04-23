@@ -1,9 +1,16 @@
 import os
+import sys
 import logging
 from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
+
+# Force line-buffered stdout so every print() appears in the uvicorn terminal
+# immediately. PYTHONUNBUFFERED=1 in .env is too late — Python sets buffering
+# before load_dotenv() runs, so we reconfigure here instead.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(line_buffering=True)
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
